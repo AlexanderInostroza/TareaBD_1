@@ -121,6 +121,7 @@ def main():
     insertar(cursor,"Boleta",["7707313090812","prueba_offer","3180","3180"])
     insertar(cursor,"Boleta",["7707313090867","prueba_offer","3290","3290"])
     insertar(cursor,"Boleta",["7707313091062","prueba_offer","3260","3260"])
+    connection.commit()
     # IMPRIMIR LA BOLETA
     mostrar_boleta(cursor)
 
