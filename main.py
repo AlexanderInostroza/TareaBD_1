@@ -22,8 +22,8 @@ import re
 ##########################################################################################
 
 # str de conexion
-str_de_conexion = "DRIVER={SQL Server};Server=localhost\SQLEXPRESS01;Database=MultiUSM;Trusted_Connection=True;" # Alex
-#str_de_conexion = "DRIVER={SQL Server};SERVER=LAPTOP-LC6S56LJ;DATABASE=MultiUSM;Trusted_Connection=yes;" # Edu
+#str_de_conexion = "DRIVER={SQL Server};Server=localhost\SQLEXPRESS01;Database=MultiUSM;Trusted_Connection=True;" # Alex
+str_de_conexion = "DRIVER={SQL Server};SERVER=LAPTOP-LC6S56LJ;DATABASE=MultiUSM;Trusted_Connection=yes;" # Edu
 
 '''
 Descripcion de la funcion
@@ -341,6 +341,7 @@ def main():
             if len(prod_encontrado) > 0:
                 for prod in prod_encontrado:
                     print("--------------------------------------------------------------------------------------")
+                    print("Codigo: " + str(prod[0]))
                     print("Nombre: " + prod[1])
                     print("Marca: " + prod[2])
                     print("Cantidad: " + str(prod[3]))
@@ -372,10 +373,17 @@ def main():
             print("Carrito vaciado")
 
         elif opcion == 7:
-            generar_boleta(cursor)
-            connection.commit()
-            mostrar_boleta(cursor)
-            print("Compra finalizada")
+            cursor.execute("SELECT * FROM Carrito")
+            compras = cursor.fetchall()
+            if len(compras) > 0:
+                generar_boleta(cursor)
+                connection.commit()
+                mostrar_boleta(cursor)
+            else:
+                print ("\n--------------------------MultiUSM--------------------------\n")
+                print("No se ha comprado ningun producto")
+                print("\n-------------------GRACIAS POR SU COMPRA-------------------\n")
+                
             #cursor.execute("DELETE FROM Carrito")
 
         else:
