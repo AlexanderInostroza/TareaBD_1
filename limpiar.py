@@ -12,12 +12,11 @@ cursor.execute("DROP TABLE Productos")
 cursor.execute("DROP TABLE Carrito")
 cursor.execute("DROP TABLE Boleta")
 cursor.execute("DROP TABLE Oferta")
-cursor.execute("DROP VIEW category_view")
 
-
-
-
-
+archivo = open("categorias.txt","r", encoding="UTF-8")
+for linea in archivo:
+    cursor.execute("DROP VIEW {}".format(linea.strip().replace(" ","_").replace(",","_")))
+archivo.close()
 
 
 connection.commit()
