@@ -22,12 +22,27 @@ import re
 ##########################################################################################
 
 # str de conexion
-#str_de_conexion = "DRIVER={SQL Server};Server=localhost\SQLEXPRESS01;Database=MultiUSM;Trusted_Connection=True;" # Alex
-str_de_conexion = "DRIVER={SQL Server};SERVER=LAPTOP-LC6S56LJ;DATABASE=MultiUSM;Trusted_Connection=yes;" # Edu
+str_de_conexion = "DRIVER={SQL Server};Server=localhost\SQLEXPRESS01;Database=MultiUSM;Trusted_Connection=True;" # Alex
+#str_de_conexion = "DRIVER={SQL Server};SERVER=LAPTOP-LC6S56LJ;DATABASE=MultiUSM;Trusted_Connection=yes;" # Edu
 
+'''
+Descripcion de la funcion
 
+    Parametros:
+        a (int): Descripcion del parametro a
+        b (int): Descripcion del parametro b
+
+    Retorno:
+        c (str): Descripcion del parametro c
+'''
 
 def top5(cursor):
+    '''
+    Muestra por pantalla los 5 productos más caros.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+    '''
     cursor.execute("SELECT TOP 5 * FROM Productos ORDER BY prod_unit_price DESC")
     print ("\n############# TOP 5 PRODUCTOS MAS CAROS #############")
     for _, prod_name, prod_description, _, _, prod_unit_price in list(cursor.fetchall()):
@@ -38,6 +53,13 @@ def top5(cursor):
         print("------------------------------")
 
 def top5_por_categoria(cursor,categoria):
+    '''
+    Muestra por pantalla los 5 productos más caros de la categoría.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            categoria (str): Nombre de la categoría.
+    '''
     categoria_formateada = categoria.replace(" ","_").replace(",","_")
     cursor.execute("SELECT TOP 5 * FROM {} ORDER BY prod_unit_price DESC".format(categoria_formateada))
     print ("\n############# TOP 5 PRODUCTOS MAS CAROS EN LA CATEGORIA {} #############".format(categoria_formateada.upper()))
@@ -48,38 +70,92 @@ def top5_por_categoria(cursor,categoria):
         print("Precio: " + str(prod_unit_price))
         print("------------------------------")
 
-
 def agregar_al_carrito(cursor, prod_id, cantidad):
+    '''
+    Agrega un producto al carro de compras.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            prod_id (int): ID del producto.
+            cantidad (int): Cantidad de producto.
+    '''
     cursor.execute("SELECT * FROM Carrito WHERE prod_id={}".format(prod_id))
     match = list(cursor.fetchall())
     if len(match) > 0: # Ya estaba en la tabla
         _, _, _, quantity = match[0]
-        #cursor.execute("UPDATE Carrito SET quantity={} WHERE prod_id={}".format(cantidad+quantity,prod_id))
-        #procedimiento almacenado aqui
-        cursor.execute("EXEC Cambiar_cantidad {},{}".format(quantity+cantidad,prod_id))
+        cursor.execute("EXEC PR_Cambiar_cantidad {},{},{}".format(quantity,cantidad,prod_id))
     else:
         cursor.execute("SELECT * FROM Productos WHERE prod_id={}".format(prod_id))
         filas_Productos = list(cursor.fetchall())
         _, prod_name, _, prod_brand, _, _ =  filas_Productos[0]
         insertar(cursor, "Carrito", [str(prod_id), prod_name, prod_brand, str(cantidad)])
 
+def mostrar_carrito(cursor):
+    '''
+    Muestra los productos del carrito por pantalla.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+    '''
+    cursor.execute("SELECT Carrito.prod_name, Carrito.quantity, Productos.prod_unit_price FROM Carrito INNER JOIN Productos ON Carrito.prod_id=Productos.prod_id")
+    res = list(cursor.fetchall())
+    if len(res) == 0:
+        print("Carrito Vacio")
+        return
+    print("################## ACTUALMENTE EN EL CARRITO ##################")
+    for prod_name, quantity, prod_unit_price in res:
+        print(" {:>3} x  {:<42} ${:>7} c/u".format(quantity, prod_name, prod_unit_price))
+
 def insertar(cursor, nombre_tabla, lista_variables): 
+    '''
+    Inserta una fila en una tabla.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            nombre_tabla (str): Tabla en la que se insertarán los datos.
+            lista_variables (lista): Lista de strings con la información que se quiere agregar. Debe respetar el formato de la tabla.
+    ''' 
     instruccion = "INSERT INTO "+nombre_tabla+" VALUES ({vars})"
     con_comilla_simple = ["'"+elemento+"'" for elemento in lista_variables]
-    #print(instruccion.format(vars = ", ".join(con_comilla_simple)))
     cursor.execute(instruccion.format(vars = ", ".join(con_comilla_simple)))
-    pass
 
 def crear_views(cursor, lista_categorias):
+    '''
+    Crea una view por cada categoría.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            lista_categorias (lista): Lista con las categorías como strings. 
+    '''
     for categoria in lista_categorias:
         instruccion = "CREATE VIEW "+ categoria.replace(" ","_").replace(",","_")+ " as SELECT prod_name,prod_description,prod_unit_price FROM Productos WHERE category='" + categoria + "'"
         cursor.execute(instruccion)
 
 def existe_tabla(cursor, tabla):
+    '''
+    Determina si existe una tabla en la base de datos.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            tabla (str): Nombre de la tabla.
+        Retorno:
+            (bool): True si existe la tabla, False si no.
+    '''
     return cursor.tables(table=tabla, tableType='TABLE').fetchone()
 
 # CASO COMPLICADO: Lavaloza Fab loza max  citrus liquido repuesto 
 def buscar_producto(cursor, nombre_producto):
+    '''
+    Busca los productos con el nombre indicado.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+            nombre_producto (str): Nombre del producto.
+
+        Retorno:
+            (lista): En la primera posición, un booleano (True si se encontró el producto, False si no) 
+            y en cada posición subsiguiente, un ID por cada producto con el nombre solicitado.
+    '''
     cursor.execute("SELECT * FROM Productos WHERE prod_name='"+ nombre_producto +"'")
     prod_encontrado = cursor.fetchall()
     if len(prod_encontrado) > 0:
@@ -97,7 +173,39 @@ def buscar_producto(cursor, nombre_producto):
         return retorno
     return [False]
 
+def generar_boleta(cursor):
+    '''
+    Genera la boleta.
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+    '''
+    ofertas = {}
+    cursor.execute("DELETE FROM Boleta")
+    cursor.execute("SELECT Carrito.prod_id, Oferta.offer FROM Oferta INNER JOIN Carrito ON Carrito.prod_id=Oferta.prod_id")
+    for prod_id, offer in list(cursor.fetchall()):
+        M,N = offer.split("x")
+        ofertas[prod_id] = (int(M),int(N))
+    cursor.execute("SELECT Carrito.prod_id, Carrito.quantity, Productos.prod_unit_price FROM Carrito INNER JOIN Productos ON Carrito.prod_id=Productos.prod_id")
+    for prod_id, quantity, unit_price in list(cursor.fetchall()):
+        total_value = quantity * unit_price
+        final_value = total_value
+        offer = ""
+        if prod_id in ofertas:
+            M,N = ofertas[prod_id]
+            fuera_de_oferta = quantity % N
+            con_oferta = (quantity // N) * M
+            final_value = (con_oferta + fuera_de_oferta) * unit_price
+            offer = str(M)+"x"+str(N)
+        insertar(cursor, "Boleta", [str(prod_id), offer, str(total_value), str(final_value)])
+
 def mostrar_boleta(cursor):
+    '''
+    Muestra la boleta por pantalla
+
+        Parametros:
+            cursor (Cursor de pyodbc): Cursor de conección.
+    '''
     cursor.execute("SELECT Productos.prod_name, Productos.prod_unit_price, Boleta.total_value FROM Boleta INNER JOIN Productos ON Boleta.prod_id=Productos.prod_id")
     print ("\n--------------------------MultiUSM--------------------------\n")
     i=1
@@ -117,45 +225,29 @@ def mostrar_boleta(cursor):
     print(linea.format("TOTAL",total_boleta))
     print("\n-------------------GRACIAS POR SU COMPRA-------------------\n")
 
-def mostrar_carrito(cursor):
-    '''
-    Muestra los productos del carrito por pantalla.
-
-        Parametros:
-            cursor (Cursor de pyodbc): Cursor de conección.
-    '''
-    cursor.execute("SELECT Carrito.prod_name, Carrito.quantity, Productos.prod_unit_price FROM Carrito INNER JOIN Productos ON Carrito.prod_id=Productos.prod_id")
-    res = list(cursor.fetchall())
-    if len(res) == 0:
-        print("CARRITO VACIO")
-        return
-    print("################## ACTUALMENTE EN EL CARRITO ##################")
-    for prod_name, quantity, prod_unit_price in res:
-        print(" {:>3} x  {:<42} ${:>7} c/u".format(quantity, prod_name, prod_unit_price))
-
 def main():
     connection = pyodbc.connect(str_de_conexion)
     cursor = connection.cursor()   
-    archivo_productos = open("ProductosVF2.csv","r",encoding="UTF-8")
-
+    #categorias = list()
+    primera_ejecucion = False
     if not existe_tabla(cursor, "Productos"):
+        primera_ejecucion = True
         cursor.execute("CREATE TABLE Productos (prod_id bigint, prod_name VARCHAR(150), prod_description VARCHAR(150), prod_brand VARCHAR(150), category VARCHAR(150), prod_unit_price int)")
         cursor.execute("CREATE TABLE Carrito (prod_id bigint, prod_name VARCHAR(150), prod_brand VARCHAR(150), quantity int)")
         cursor.execute("CREATE TABLE Boleta (prod_id bigint, offer VARCHAR(150), total_value int, final_value int)")
         cursor.execute("CREATE TABLE Oferta (prod_id bigint, offer VARCHAR(150))")
-        cursor.execute("CREATE PROCEDURE PR_Cambiar_cantidad @Cantidad as int, @id_prod as bigint AS UPDATE Carrito SET quantity=@Cantidad WHERE prod_id=@id_prod")
-        cursor.execute("CREATE TRIGGER TR_Productos_Eliminados on Carrito FOR UPDATE as BEGIN DELETE FROM Carrito WHERE quantity<1 END")
+        cursor.execute("CREATE PROCEDURE PR_Cambiar_cantidad @Cantidad_actual as int,@Cantidad_cambio as int, @id_prod as bigint AS BEGIN DECLARE @Final_cantidad int SET @Final_cantidad = [dbo].[Valor_cantidad] (@Cantidad_actual,@Cantidad_cambio) UPDATE Carrito SET quantity=@Final_cantidad WHERE prod_id=@id_prod END")
+        cursor.execute("CREATE TRIGGER TR_Productos_Eliminados on Carrito FOR UPDATE as BEGIN DELETE FROM Carrito WHERE quantity=0 END")
+        cursor.execute("CREATE FUNCTION Valor_cantidad (@Cantidad_actual int,@Variacion_cantidad int)RETURNS int as BEGIN DECLARE @Cantidad_final int SET @Cantidad_final = @Cantidad_actual + @Variacion_cantidad IF @Cantidad_final < 0 RETURN 0 RETURN @Cantidad_final END")
 
+        archivo_productos = open("ProductosVF2.csv","r",encoding="UTF-8")
         flag = False
         re_oferta = re.compile(r".*pag(a|ue) (\d+) *llev(a|e) (\d+).?\n?$")
-        categorias = list()
         for linea in archivo_productos:
             if flag:
                 lista_variables = linea.replace("'","").strip().split(";")
                 prod_id, _, prod_description, _, category, _ = lista_variables
                 insertar(cursor, "Productos", lista_variables)
-                if category not in categorias:
-                    categorias.append(category)
                 offerMatch = re_oferta.match(prod_description.lower())
                 if offerMatch != None:
                     offer = offerMatch.group(2) + "x" + offerMatch.group(4)
@@ -163,7 +255,12 @@ def main():
             flag = True
         archivo_productos.close() 
 
+    cursor.execute("SELECT DISTINCT category FROM Productos")
+    categorias = [tup[0] for tup in list(cursor.fetchall())]
+    if primera_ejecucion:
         crear_views(cursor,categorias)
+
+    connection.commit()
         
     opcion = 1
     while opcion != 7:
@@ -187,12 +284,19 @@ def main():
                     if agregar.lower() == "y":
                         cantidad = int(input("Cuantas unidades desea agregar?: "))
                         agregar_al_carrito(cursor,busqueda[1],cantidad)
-                    # else no pasa nada ¿?¿?
+                        connection.commit()
+                        print("Producto agregado correctamente")
+                    else:
+                        print("Producto no agregado")
                 else:
                     agregar = input("Si desea agregar uno de estos productos al carrito, escriba el ID del producto: ")
                     if agregar in busqueda[1:]:
                         cantidad = int(input("Cuantas unidades desea agregar?: "))
                         agregar_al_carrito(cursor, agregar, cantidad)
+                        connection.commit()
+                        print("Producto agregado correctamente")
+                    else:
+                        print("Producto no encontrado")
             else:
                 print("Producto no encontrado")
 
@@ -245,11 +349,19 @@ def main():
                 cursor.execute("SELECT * FROM Carrito WHERE prod_name='" + nombre_prod + "'")
                 prods_encontrados = cursor.fetchall()
                 if len(prods_encontrados) == 1:
-                    cantidad = int(input("Ingrese las unidades que desea eliminar: "))
+                    cantidad = -(int(input("Ingrese las unidades que desea eliminar: ")))
                     prod_id, _, _, quantity = prods_encontrados[0]
-                    cursor.execute("EXEC PR_Cambiar_cantidad {},{}".format(quantity-cantidad,prod_id))
+                    cursor.execute("EXEC PR_Cambiar_cantidad {},{},{}".format(quantity,cantidad,prod_id))
                 elif len(prods_encontrados) > 1:
-                    print("Se encontraros productos con el mismo nombre")
+                    print("Se encontraron varios productos con el mismo nombre")
+                    prod_id = input("Escriba el ID del producto que desea eliminar: ")
+                    cursor.execute("SELECT * FROM Carrito WHERE prod_id={}".format(prod_id))
+                    prod_encontrado = cursor.fetchall()
+                    if len(prod_encontrado) == 1:
+                        cantidad = -(int(input("Ingrese las unidades que desea eliminar: ")))
+                        cursor.execute("EXEC PR_Cambiar_cantidad {},{},{}".format(prod_encontrado[0][3],cantidad,prod_id))
+                    else:
+                        print("El producto ingresado no existe en el carrito")
                 else: 
                     print("El producto ingresado no existe en el carrito")
             else:
@@ -260,8 +372,11 @@ def main():
             print("Carrito vaciado")
 
         elif opcion == 7:
-            #generar boleta
+            generar_boleta(cursor)
+            connection.commit()
+            mostrar_boleta(cursor)
             print("Compra finalizada")
+            #cursor.execute("DELETE FROM Carrito")
 
         else:
             print("Opcion invalida, reintente")
@@ -270,6 +385,6 @@ def main():
     cursor.close()
     connection.close()
 
-
+#Jabon Lak sensaciones barra 
 if __name__ == "__main__":
     main()
