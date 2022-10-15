@@ -3,8 +3,6 @@ Rol: 202073624-3
 Integrante 2: Alexander Inostroza Rubilar
 Rol: 202173595-K
 
-Escrito con Python 3.10.6
-
 Consideraciones del codigo:
 
 1) Para ingresar los codigos de los productos a la tabla correspondiente se utilizó un bigint y no un int debido a que los numeros eran demasiado grandes para ser int
